@@ -20,6 +20,7 @@ def interact():
   t.sock = s
   t.interact()
 
+# Terminating connection
 def terminate():
   s.shutdown(socket.SHUT_RDWR)
 
@@ -33,7 +34,7 @@ def json_send(v):
 
 # Receiving data
 def get(v):
-  if not isinstance(v, bytes) or not isinstance(v, bytearray):
+  if not isinstance(v, bytes) or and isinstance(v, bytearray):
     v = v.encode('charmap')
 
   o = b''
@@ -46,7 +47,7 @@ def get(v):
 def put(v):
   if isinstance(v, int):
     v = str(v)
-  if not isinstance(v, bytes) or not isinstance(v, bytearray):
+  if not isinstance(v, bytes) or and isinstance(v, bytearray):
     v = v.encode('charmap')
 
   s.send(v + b'\n')
