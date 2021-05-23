@@ -57,8 +57,9 @@ def connect(timeout=0):
   s.connect((Host, Port))
   if timeout:
     s.settimeout(timeout)
+  return s
 
-connect()
+s = connect()
 
 # Code here
 
