@@ -1,5 +1,5 @@
 # Helper-Scripts
-Random Scripts for solving CTF tasks.
+Random Scripts that help in CTFs.
 
 * [Connection](https://github.com/DaBaddest/Helper-Scripts/blob/master/connection.py) - Helper script for challenges which requires network interaction
 
