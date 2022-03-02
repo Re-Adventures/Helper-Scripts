@@ -57,8 +57,8 @@ def get_offsets():
 
   START = START.strip()
   # input(START)
-  tmp = START.split()
-  print(tmp)
+  # tmp = START.split()
+  # print(tmp)
   # input(tmp)
   START, VA = int(tmp[4], 16), int(tmp[3], 16)
 
