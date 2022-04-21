@@ -2,6 +2,7 @@
 import distorm3
 import sys
 import subprocess
+import re
 import os
 
 # We can manually set it too
@@ -57,7 +58,7 @@ def get_offsets():
 
   START = START.strip()
   # input(START)
-  # tmp = START.split()
+  tmp = START.split()
   # print(tmp)
   # input(tmp)
   START, VA = int(tmp[4], 16), int(tmp[3], 16)
@@ -74,10 +75,66 @@ def get_offsets():
   print_green(f"VA: {VA:#010x}")
 
 
-# TODO: Need to implement
-def check_interesting(lst):
-  pass
+def MakeFunction(address, inst, pattern):
+  if distorm3.Decode32Bits == MODE:
+    decoding = "dword"
+  if distorm3.Decode64Bits == MODE:
+    decoding = "qword"
 
+  regs = ""
+  toWrite = f"#{address} {inst}\n"
+
+  if "pop" in pattern:
+    # Scarry string parsing
+    funcName = '_'.join(''.join(inst.split("; ")).split("pop ")[1:]).replace("ret", "")
+    regs = funcName.split("_")
+
+    params = ''.join([f"{i} = 0, " for i in regs])[:-2]
+
+    toWrite += f"def pop_{funcName}({params}):\n"
+
+  elif "mov " in pattern:
+    inst = inst.replace("; ret", "").replace("mov ", "")
+    inst = inst.replace("[", "").replace("]", "")
+    inst = inst.split(", ")
+
+    funcName = '_'.join(inst)
+
+    toWrite += f"def write_into_{funcName}():\n"
+    print(toWrite)
+
+  else:
+    return ""
+
+  toWrite += f"  return {decoding}({address[:-1]})"
+
+  if regs:
+    for reg in regs:
+      toWrite += f" + {decoding}({reg})"
+
+  return toWrite
+
+uniq = []
+def check_interesting(address, inst):
+  inst = inst.lower()
+  if inst in uniq:
+    return False
+
+  patterns32Bit = ["(pop e.*?; )+ret", "(push e.*?; )+ret", "mov \[e\w+\], e..; ret"]
+  patterns64Bit = ["(pop r\w+; )+ret", "(push r\w+; )+ret", "mov \[r\w+\], [r,e]\w+; ret"]
+
+  if distorm3.Decode32Bits == MODE:
+    patterns = patterns32Bit
+  elif distorm3.Decode64Bits == MODE:
+    patterns = patterns64Bit
+
+  if not patterns:
+    return None
+
+  for pattern in patterns:
+    if re.match(pattern, inst):
+      uniq.append(inst)
+      return MakeFunction(address, inst, pattern)
 
 def get_gadgets():
   gadget = []
@@ -110,7 +167,6 @@ def get_gadgets():
       if tmp in gadget:  # Checking if its not already found
         continue
       off.append(lst1[0].split()[0])
-      check_interesting(tmp2)
       gadget.append(tmp)
       gadget2.append(tmp2) # gadgets in a single line
 
@@ -155,19 +211,29 @@ if  '__main__' == __name__:
   to_write = ''
 
   width = os.get_terminal_size()[0]
+  interesting_gadgets = []
 
-  for i, j, k in zip(offsets, gadgets, gadgets2):
+  # Dynamically create python functions
+  FunctionForROP = ['''import struct
+byte  = lambda v: struct.pack("<B", v)
+word  = lambda v: struct.pack("<H", v)
+dword = lambda v: struct.pack("<I", v)
+qword = lambda v: struct.pack("<Q", v)''']
+
+  for address, j, k in zip(offsets, gadgets, gadgets2):
     # Removing gadgets that only have one instruction i.e just ret instruction
     if len(j.splitlines()) == 1:
       continue
     print('-' * width)
-    print_green("Offset: %s" % i)
+    print_green("Offset: %s" % address)
     print(j)
     print()
-    print(i, k)
-    to_write += f"{i} {k}\n"
-    if check_interesting(k):
-      interesting_gadgets.append(f"{i} {k}\n")
+    print(address, k)
+    to_write += f"{address} {k}\n"
+    funcDef = check_interesting(address, k)
+    if funcDef:
+      FunctionForROP.append(funcDef)
+      interesting_gadgets.append(f"{address} {k}")
     print()
     gad_count += 1
 
@@ -176,4 +242,16 @@ if  '__main__' == __name__:
 
   with open("gadgets.asm", "w") as fp:
     fp.write(("Total %i gadgets found\n" % gad_count) + to_write)
+
+  if len(FunctionForROP) > 5:
+    print_yellow('Writing Useful Function to "usefulFunction.py" file')
+    with open("usefulFunction.py", 'w') as fp:
+      fp.write('\n\n'.join(FunctionForROP) + "\n\n")
+
+
+  if interesting_gadgets:
+    print_yellow("****List Of Interesting Gadgets****")
+    for i in interesting_gadgets:
+      print_green(i)
+
 
