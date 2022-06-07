@@ -2,21 +2,44 @@ use std::io::Read;
 use std::process;
 use std::fs;
 use std::env;
+
+fn color_code_hex(elem: u8) -> String{
+  return match elem{
+    0         => format!("\x1b[31m{:02x}\x1b[0m", elem),
+    1..=32    => format!("\x1b[33m{:02x}\x1b[0m", elem),
+    48..=57   => format!("\x1b[35m{:02x}\x1b[0m", elem),
+    127..=255 => format!("\x1b[34m{:02x}\x1b[0m", elem),
+    _         => format!("\x1b[32m{:02x}\x1b[0m", elem),
+  };
+}
+
+fn color_code_char(elem: u8) -> String{
+  return match elem{
+    0         => "\x1b[31m⋄\x1b[0m".to_string(),
+    1..=32    => "\x1b[33m×\x1b[0m".to_string(),
+    48..=57   => format!("\x1b[35m{}\x1b[0m", char::from(elem)),
+    127..=255 => "\x1b[34m•\x1b[0m".to_string(),
+    _         => format!("\x1b[32m{}\x1b[0m", char::from(elem)),
+  };
+}
+
+fn read_file(filename: String) -> Vec<u8>{
+  let mut tmp: Vec<u8> = Vec::new();
+  let mut fp = fs::File::open(filename).expect("Failed in opening file");
+  fp.read_to_end(&mut tmp).expect("Failed while reading file contents");
+  return tmp;
+}
+
 fn main(){
   let argv: Vec<String> = env::args().collect();
   if argv.len() < 2{
     println!("Usage hexx <filename>");
     process::exit(1);
   }
-  let filename = &argv[1];
-  let mut fp = fs::File::open(filename).expect("Failed in opening file");
-
-  let mut data: Vec<u8> = Vec::new();
-  fp.read_to_end(&mut data).expect("Failed while reading file contents");
+  let data: Vec<u8> = read_file(argv[1].to_string());
 
   println!("┌────────┬─────────────────────────┬─────────────────────────┬────────┬────────┐");
   
-  let mut tmp: String;
   let mut i = 0;
   while i < data.len(){
     print!("│\x1b[36m{:08x}\x1b[0m│", i);
@@ -26,13 +49,7 @@ fn main(){
         print!("   ");
       }
       else{
-        match data[i + j]{
-          0 => tmp = format!("\x1b[31m{:02x}\x1b[0m", data[i + j]),
-          1..=32 => tmp = format!("\x1b[33m{:02x}\x1b[0m", data[i + j]),
-          33..=126 => tmp = format!("\x1b[32m{:02x}\x1b[0m", data[i + j]),
-          127..=255 => tmp = format!("\x1b[34m{:02x}\x1b[0m", data[i + j]),
-        };
-        print!(" {}", tmp);
+        print!(" {}", color_code_hex(data[i + j]));
       }
       if 7 == j{
         print!(" ┆");
@@ -45,25 +62,14 @@ fn main(){
         print!(" ");
       }
       else{
-        match data[i + j]{
-          0 => tmp = "\x1b[31m⋄\x1b[0m".to_string(),
-          1..=32 => tmp = "\x1b[33m•\x1b[0m".to_string(),
-          33..=126 => tmp = format!("\x1b[32m{}\x1b[0m", char::from(data[i + j])),
-          127..=255 => tmp = "\x1b[34m×\x1b[0m".to_string(),
-        };
-
-        print!("{}", tmp);
+        print!("{}", color_code_char(data[i + j]));
       }
       if 7 == j{
         print!("┆");
       }
     }
-
     println!("│");
     i += 16;
-    // if 16 * 4 == i{
-      // break;
-    // }
   }
   println!("└────────┴─────────────────────────┴─────────────────────────┴────────┴────────┘");
 
