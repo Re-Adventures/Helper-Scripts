@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import distorm3
 import sys
 import subprocess
