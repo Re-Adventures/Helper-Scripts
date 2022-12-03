@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import subprocess
 import telnetlib
 import socket
@@ -6,77 +5,72 @@ import struct
 import json
 import sys
 
-Host, Port = '127.0.0.1', 1234
-process = 'a.exe'
-
 byte  = lambda v: struct.pack("<B", v)
 word  = lambda v: struct.pack("<H", v)
 dword = lambda v: struct.pack("<I", v)
 qword = lambda v: struct.pack("<Q", v)
 
-pattern =  ''.join([chr(x)*8 for x in range(0x41, 0x5B)]).encode()
-pattern += ''.join([chr(x)*8 for x in range(0x61, 0x7B)]).encode()
+pattern  = ''.join([chr(x)*8 for x in range(0x41, 0x5B)])
+pattern += ''.join([chr(x)*8 for x in range(0x61, 0x7B)])
 
-pattern32 =  ''.join([chr(x)*4 for x in range(0x41, 0x5B)]).encode()
+pattern32  = ''.join([chr(x)*4 for x in range(0x41, 0x5B)]).encode()
 pattern32 += ''.join([chr(x)*4 for x in range(0x61, 0x7B)]).encode()
 
-
-def CreateFile(data=""):
+def CreateFile(s=""):
   tmp = pattern
-  if data:
+  if s:
     if isinstance(data, str):
       data = str(data).encode('charmap')
-    tmp = data
+    tmp = s
 
   with open('tmp', 'wb') as fp:
-    if isinstance(tmp, str):
-      tmp = tmp.encode()
-    fp.write(tmp)
+    fp.write(tmp.encode())
 
   return tmp
 
+def convert_to_bytes(data = ""):
+  if not data:
+    return b""
+
+  if isinstance(data, int):
+    data = str(data).encode('charmap')
+
+  if not isinstance(data, bytes) and not isinstance(data, bytearray):
+    data = data.encode('charmap')
+
+  return data
+
 
 class Remote:
-  def __init__(this):
+  limit = None
+  def __init__(this, host, port, limit=None):
     '''Initiates the connection'''
     this.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    this.conn.connect((Host, Port))
+    this.conn.connect((host, port))
+    if limit:
+      this.limit = limit
 
   def get(this, data):
     '''Used for receiving data'''
+    data = convert_to_bytes(data)
 
-    # Some checks to convert the data to bytes
-    if isinstance(data, int):
-      data = str(data).encode('charmap')
-
-    if not isinstance(data, bytes) and not isinstance(data, bytearray):
-      data = data.encode('charmap')
-
-    # TODO: Implement timeout mechanism
     o = b''
     while 1:
       o += this.conn.recv(1)
       if data in o:
         return o
 
+  def getline(this, data=""):
+    this.get(convert_to_bytes(data) + b'\n')
+
   def put(this, data):
     '''Used for sending data'''
+    this.conn.send(convert_to_bytes(data))
 
-    # TODO: Implement timeout mechanism
-    # TODO: Logging Mechanisms
-
-    # Some checks to convert the data to bytes before sending
-    if isinstance(data, int):
-      data = str(data).encode('charmap')
-
-    if not isinstance(data, bytes) and not isinstance(data, bytearray):
-      data = data.encode('charmap')
-
-    # TODO: Implement timeout mechanism
-    this.conn.send(data)
+  def putline(this, data):
+    this.put(convert_to_bytes(data) + b'\n')
 
   def json_send(this, v):
-    # TODO: Logging Mechanisms
     request = json.dumps(v).encode('charmap')
     this.put(request)
 
@@ -84,10 +78,12 @@ class Remote:
     dat = this.get(data)
     return json.loads(dat.decode('charmap'))
 
-  def interact(this):
+  def interactive(this):
     '''Interactive shell'''
     t = telnetlib.Telnet()
     t.sock = this.conn
+    if this.limit:
+      t.timeout = this.limit
     t.interact()
 
   def terminate(this):
@@ -95,7 +91,7 @@ class Remote:
     this.conn.shutdown(socket.SHUT_RDWR)
 
 class Local:
-  def __init__(this):
+  def __init__(this, process):
     '''Starting the process'''
     this.proc = subprocess.Popen(process.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -103,16 +99,9 @@ class Local:
     this.stdout = this.proc.stdout
     this.stderr = this.proc.stderr
 
-
   def get(this, data):
     '''Receiving data'''
-    # TODO: Implement timeout mechanism
-    # Flush might be required
-    if isinstance(data, int):
-      data = str(data).encode('charmap')
-
-    if not isinstance(data, bytes) and not isinstance(data, bytearray):
-      data = data.encode('charmap')
+    data = convert_to_bytes(data)
 
     o = b''
     while 1:
@@ -121,18 +110,18 @@ class Local:
       if data in o:
         return o
 
+  def getline(this, data=""):
+    this.get(convert_to_bytes(data) + b'\n')
+
   def put(this, data):
     '''Sending data'''
-    # TODO: Implement timeout mechanism
-    # Dont forget to flush data
-    if isinstance(data, int):
-      data = str(data).encode('charmap')
-
-    if not isinstance(data, bytes) and not isinstance(data, bytearray):
-      data = data.encode('charmap')
-
-    this.stdin.write(data)
+    this.stdin.write(convert_to_bytes(data))
     this.stdin.flush()
+
+  def putline(this, data):
+    this.put(convert_to_bytes(data) + b'\n')
 
   def terminate(this):
     this.proc.terminate()
+
+
